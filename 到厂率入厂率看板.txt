@@ -1,0 +1,152 @@
+ select a.DATATIME,a.STATION_NAME STATIONNAME,a.WH_NO_ORDER,a.WH_NAME_ORDER,date_format(a.DISPATCHDATE,'%Y-%m-%d') DISPATCHDATE,
+CONCAT_WS(
+		'-',
+		ifNULL(a.START_TIME, '0:00'),
+		ifNULL(a.END_TIME, '0:00')
+	) AS APPOINT_TIME,SUM(a.cut) S1,SUM(a.cut1) S2,SUM(a.cut2) S3,concat(round(round(sum(a.cut1)/sum(a.cut),2)*100),'%') S4,
+SUM(a.cut3) S5,SUM(a.cut1)-SUM(a.cut3) S6,
+concat(round(round((SUM(a.cut1)-SUM(a.cut3))/SUM(a.cut1),2)*100),'%') S7,
+SUM(a.cut4) S8,concat(round(round(SUM(a.cut4)/(SUM(a.cut1)-SUM(a.cut3)),2)*100),'%') S9,
+cw.CDWH_FACTORY_NO,
+cw.CDWH_FACTORY_NAME
+ from (
+SELECT
+a.START_TIME START_TIME,
+a.END_TIME END_TIME,
+date_format(a.APPOINT_DATE,'%Y-%m-%d') dataTime,
+count(*) AS cut,
+0 AS cut1,
+0 AS cut2,
+0 AS cut3,
+0 AS cut4,
+vdo.DISPATCH_ORDER_DATE as dispatchDate,
+vdo.WH_NO_ORDER,
+vdo.WH_NAME_ORDER,
+vdo.STATION_ID,
+vdo.STATION_NAME
+FROM
+	vr_dispatch_order vdo
+inner JOIN 
+(select vao2.VRDO_NO,vao2.START_TIME,vao2.END_TIME,vao2.APPOINT_DATE from vr_appoint_order vao2 where vao2.APPOINT_STATUS="SUCCESS" and TIMESTAMPDIFF(DAY,vao2.CREATE_TIME,DATE_FORMAT(NOW(),'%Y-%m-%d %H:%i:%s'))<=10)
+a on vdo.VRDO_NO=a.VRDO_NO
+WHERE
+TIMESTAMPDIFF(DAY,a.APPOINT_DATE,DATE_FORMAT(NOW(),'%Y-%m-%d %H:%i:%s'))<=7
+GROUP BY a.START_TIME,a.END_TIME,vdo.DISPATCH_ORDER_DATE,vdo.WH_NO_ORDER,dataTime 
+
+union ALL
+
+SELECT
+a.START_TIME START_TIME,
+a.END_TIME END_TIME,
+date_format(a.APPOINT_DATE,'%Y-%m-%d') dataTime,
+0 AS cut,
+count(*) AS cut1,
+0 AS cut2,
+0 AS cut3,
+0 AS cut4,
+vdo.DISPATCH_ORDER_DATE as dispatchDate,
+vdo.WH_NO_ORDER,
+vdo.WH_NAME_ORDER,
+vdo.STATION_ID,
+vdo.STATION_NAME
+FROM
+	vr_dispatch_order vdo
+inner JOIN 
+(select vao2.VRDO_NO,vao2.START_TIME,vao2.END_TIME,vao2.APPOINT_DATE from vr_appoint_order vao2 where vao2.APPOINT_STATUS="SUCCESS" and TIMESTAMPDIFF(DAY,vao2.CREATE_TIME,DATE_FORMAT(NOW(),'%Y-%m-%d %H:%i:%s'))<=10)
+a on vdo.VRDO_NO=a.VRDO_NO
+WHERE
+TIMESTAMPDIFF(DAY,a.APPOINT_DATE,DATE_FORMAT(NOW(),'%Y-%m-%d %H:%i:%s'))<=7
+ AND vdo.VRDO_STATUS not in ("NEW","DISPATCH","ISSUED","APPOINTMENT","RECEIPT","CANCEL")
+GROUP BY a.START_TIME,a.END_TIME,vdo.DISPATCH_ORDER_DATE,vdo.WH_NO_ORDER,dataTime
+
+union ALL
+
+SELECT
+a.START_TIME START_TIME,
+a.END_TIME END_TIME,
+date_format(a.APPOINT_DATE,'%Y-%m-%d') dataTime,
+0 AS cut,
+0 AS cut1,
+count(*) AS cut2,
+0 AS cut3,
+0 AS cut4,
+vdo.DISPATCH_ORDER_DATE as dispatchDate,
+vdo.WH_NO_ORDER,
+vdo.WH_NAME_ORDER,
+vdo.STATION_ID,
+vdo.STATION_NAME
+FROM
+	vr_dispatch_order vdo
+inner JOIN 
+(select vao2.VRDO_NO,vao2.START_TIME,vao2.END_TIME,vao2.APPOINT_DATE from vr_appoint_order vao2 where vao2.APPOINT_STATUS="SUCCESS" and TIMESTAMPDIFF(DAY,vao2.CREATE_TIME,DATE_FORMAT(NOW(),'%Y-%m-%d %H:%i:%s'))<=10)
+a on vdo.VRDO_NO=a.VRDO_NO
+WHERE
+TIMESTAMPDIFF(DAY,a.APPOINT_DATE,DATE_FORMAT(NOW(),'%Y-%m-%d %H:%i:%s'))<=7
+ AND vdo.VRDO_STATUS in ("NEW","DISPATCH","ISSUED","APPOINTMENT","RECEIPT","CANCEL")
+GROUP BY a.START_TIME,a.END_TIME,vdo.DISPATCH_ORDER_DATE,vdo.WH_NO_ORDER,dataTime
+
+union all 
+SELECT
+a.START_TIME START_TIME,
+a.END_TIME END_TIME,
+date_format(a.APPOINT_DATE,'%Y-%m-%d') dataTime,
+0 AS cut,
+0 AS cut1,
+0 AS cut2,
+count(*) cut3,
+0 AS cut4,
+vdo.DISPATCH_ORDER_DATE as dispatchDate,
+vdo.WH_NO_ORDER,
+vdo.WH_NAME_ORDER,
+vdo.STATION_ID,
+vdo.STATION_NAME
+FROM
+	vr_dispatch_order vdo
+inner JOIN 
+(select vao2.VRDO_NO,vao2.START_TIME,vao2.END_TIME,vao2.APPOINT_DATE from vr_appoint_order vao2 where vao2.APPOINT_STATUS="SUCCESS" and TIMESTAMPDIFF(DAY,vao2.CREATE_TIME,DATE_FORMAT(NOW(),'%Y-%m-%d %H:%i:%s'))<=10)
+a on vdo.VRDO_NO=a.VRDO_NO
+LEFT JOIN vr_work_order vwo on vwo.DISPATCH_NO=vdo.VRDO_NO
+WHERE
+TIMESTAMPDIFF(DAY,a.APPOINT_DATE,DATE_FORMAT(NOW(),'%Y-%m-%d %H:%i:%s'))<=7
+ AND vdo.VRDO_STATUS in ("REPORT")
+and vwo.WORK_STATUS in ("NEW","ARRIVE_FACTORY")
+GROUP BY a.START_TIME,a.END_TIME,vdo.DISPATCH_ORDER_DATE,vdo.WH_NO_ORDER,dataTime
+
+
+
+union ALL
+
+SELECT
+a.START_TIME START_TIME,
+a.END_TIME END_TIME,
+date_format(a.APPOINT_DATE,'%Y-%m-%d') dataTime,
+0 AS cut,
+0 AS cut1,
+0 AS cut2,
+0 AS cut3,
+count(*) AS cut4,
+vdo.DISPATCH_ORDER_DATE as dispatchDate,
+vdo.WH_NO_ORDER,
+vdo.WH_NAME_ORDER,
+vdo.STATION_ID,
+vdo.STATION_NAME
+FROM
+	vr_dispatch_order vdo
+inner JOIN 
+(select vao2.VRDO_NO,vao2.START_TIME,vao2.END_TIME,vao2.APPOINT_DATE from vr_appoint_order vao2 where vao2.APPOINT_STATUS="SUCCESS" and TIMESTAMPDIFF(DAY,vao2.CREATE_TIME,DATE_FORMAT(NOW(),'%Y-%m-%d %H:%i:%s'))<=10)
+a on vdo.VRDO_NO=a.VRDO_NO
+LEFT JOIN vr_work_order vwo on vwo.DISPATCH_NO=vdo.VRDO_NO
+WHERE
+TIMESTAMPDIFF(DAY,a.APPOINT_DATE,DATE_FORMAT(NOW(),'%Y-%m-%d %H:%i:%s'))<=7
+ AND vdo.VRDO_STATUS in ("LEAVE","PART","COMPLETE")
+GROUP BY a.START_TIME,a.END_TIME,vdo.DISPATCH_ORDER_DATE,vdo.WH_NO_ORDER,dataTime
+
+) as a LEFT JOIN cd_warehouse cw on a.WH_NO_ORDER=cw.CDWH_CODE
+where 1=1
+<<AND cw.CDWH_FACTORY_NO like CONCAT('%',:FACTORY_NO,'%')>>
+<<AND cw.CDWH_FACTORY_NAME like CONCAT('%',:FACTORY_NAME,'%')>>
+<<AND a.dataTime like CONCAT('%',:DATATIME,'%')>>
+<<AND a.dispatchDate like CONCAT('%',:DISPATCHDATE,'%')>>
+ ##STATIONAUTHORITY$a.STATION_ID##
+GROUP BY a.WH_NO_ORDER,a.START_TIME,a.END_TIME,a.dataTime,a.dispatchDate
+ORDER BY a.dispatchDate DESC,a.STATION_NAME,a.WH_NAME_ORDER,a.START_TIME
